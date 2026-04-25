@@ -48,7 +48,7 @@ def payout(request):
         if request.method != "POST":
             return JsonResponse({"error": "invalid_method"}, status=405)
 
-        # ✅ Safe JSON handling (no empty_body crash)
+        # safe JSON parse
         try:
             data = json.loads(request.body or "{}")
         except:
@@ -63,7 +63,7 @@ def payout(request):
 
         amount = int(amount)
 
-        # ✅ Idempotency
+        # idempotency check
         if Idempotency.objects.filter(key=idem_key).exists():
             return JsonResponse({"status": "duplicate"})
 
@@ -83,7 +83,7 @@ def payout(request):
             if balance < amount:
                 return JsonResponse({"error": "insufficient_funds"}, status=400)
 
-            # ✅ DIRECT PROCESSING (NO CELERY)
+            # create payout
             Payout.objects.create(
                 merchant=merchant,
                 amount=amount,
@@ -91,12 +91,14 @@ def payout(request):
                 retries=0
             )
 
+            # update ledger
             Ledger.objects.create(
                 merchant=merchant,
                 amount=amount,
                 type="debit"
             )
 
+            # save idempotency
             Idempotency.objects.create(key=idem_key)
 
         return JsonResponse({"status": "completed"})
