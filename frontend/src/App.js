@@ -82,7 +82,9 @@ export default function App() {
 
   // ---------------- AUTO REFRESH ----------------
   useEffect(() => {
-    fetchData();
+    fetch(`${API}/balance/${MID}/`)  // wake up backend
+      .then(() => fetchData())
+      .catch(() => setError("Backend waking up..."));
 
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
