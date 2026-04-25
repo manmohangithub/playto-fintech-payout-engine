@@ -1,5 +1,4 @@
+Django
 gunicorn
 whitenoise
-redis
-celery
 django-cors-headers
