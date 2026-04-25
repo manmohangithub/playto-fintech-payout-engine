@@ -1,0 +1,6 @@
+
+Django
+mysqlclient
+celery
+redis
+django-cors-headers
