@@ -87,8 +87,13 @@ CSRF_TRUSTED_ORIGINS = [
 # 🔥 CELERY
 # ====================================================
 
-CELERY_BROKER_URL = "rediss://default:gQAAAAAAAU8wAAIgcDJmY2M2MTZhM2VkODk0OTRkODNkOWNlMWM0NDM0MDY4NQ@driving-dane-85808.upstash.io:6379"
-CELERY_RESULT_BACKEND = "rediss://default:gQAAAAAAAU8wAAIgcDJmY2M2MTZhM2VkODk0OTRkODNkOWNlMWM0NDM0MDY4NQ@driving-dane-85808.upstash.io:6379"
+CELERY_BROKER_URL = os.getenv("REDIS_URL")
+CELERY_RESULT_BACKEND = os.getenv("REDIS_URL")
+
+# Required for Upstash TLS
+CELERY_BROKER_USE_SSL = {
+    "ssl_cert_reqs": 0
+}
 
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
