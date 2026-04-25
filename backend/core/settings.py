@@ -3,14 +3,17 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'playto-secret'
-DEBUG = True
-ALLOWED_HOSTS = ['*']
+# -------------------------
+# SECURITY
+# -------------------------
+SECRET_KEY = 'playto-secret-key'
+DEBUG = os.getenv("DEBUG", "False") == "True"
+ALLOWED_HOSTS = ["*"]
 
-# 🔥 APPS
+# -------------------------
+# INSTALLED APPS
+# -------------------------
 INSTALLED_APPS = [
-    'corsheaders',  # MUST BE FIRST
-
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -18,25 +21,33 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    'corsheaders',
     'app',
 ]
 
-# 🔥 MIDDLEWARE (ORDER VERY IMPORTANT)
+# -------------------------
+# MIDDLEWARE
+# -------------------------
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
-
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-
     'django.middleware.csrf.CsrfViewMiddleware',
-
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
 ]
 
+# -------------------------
+# URLS
+# -------------------------
 ROOT_URLCONF = 'core.urls'
 
+# -------------------------
+# TEMPLATES
+# -------------------------
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -51,50 +62,52 @@ TEMPLATES = [
     },
 ]
 
+# -------------------------
+# WSGI
+# -------------------------
 WSGI_APPLICATION = 'core.wsgi.application'
 
-# 🔥 DATABASE (MySQL)
+# -------------------------
+# DATABASE (RENDER SAFE)
+# -------------------------
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'playto',
-        'USER': 'root',
-        'PASSWORD': 'root123',
-        'HOST': '127.0.0.1',
-        'PORT': '3306',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
+# -------------------------
+# STATIC FILES
+# -------------------------
 STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# -------------------------
+# DEFAULT FIELD
+# -------------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# ====================================================
-# 🔥🔥🔥 CORS FIX (CRITICAL)
-# ====================================================
-
+# -------------------------
+# CORS (FRONTEND ACCESS)
+# -------------------------
 CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
 
-CORS_ALLOW_HEADERS = ['*']
-CORS_ALLOW_METHODS = ['GET', 'POST', 'OPTIONS']
-
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-
-# ====================================================
-# 🔥 CELERY
-# ====================================================
-
+# -------------------------
+# CELERY (UPSTASH REDIS)
+# -------------------------
 CELERY_BROKER_URL = os.getenv("REDIS_URL")
 CELERY_RESULT_BACKEND = os.getenv("REDIS_URL")
 
-# Required for Upstash TLS
+# Required for Upstash TLS (rediss)
 CELERY_BROKER_USE_SSL = {
     "ssl_cert_reqs": 0
 }
 
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
+# -------------------------
+# LOGGING (OPTIONAL DEBUG)
+# -------------------------
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+}
