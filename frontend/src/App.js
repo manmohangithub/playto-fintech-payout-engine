@@ -16,20 +16,22 @@ export default function App() {
     try {
       setError("");
 
-      const b = await fetch(`${API}/balance/${MID}/`);
-      const p = await fetch(`${API}/payouts/${MID}/`);
+      const bRes = await fetch(`${API}/balance/${MID}/`);
+      const pRes = await fetch(`${API}/payouts/${MID}/`);
 
-      if (!b.ok || !p.ok) throw new Error("Backend error");
+      if (!bRes.ok || !pRes.ok) {
+        throw new Error("Backend error");
+      }
 
-      const bData = await b.json();
-      const pData = await p.json();
+      const bData = await bRes.json();
+      const pData = await pRes.json();
 
       setBalance(bData.balance || 0);
       setPayouts(pData.data || []);
 
     } catch (err) {
       console.error(err);
-      setError("Backend not reachable / waking up...");
+      setError("Backend sleeping / first request delay...");
     }
   };
 
@@ -48,19 +50,23 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": Date.now().toString(), // safer than crypto
         },
         body: JSON.stringify({
           merchant_id: MID,
-          amount: parseInt(amount),
+          amount: Number(amount),
         }),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("Invalid server response");
+      }
 
       if (!res.ok) {
-        alert(data.error || "Payout failed");
-        return;
+        throw new Error(data.error || "Payout failed");
       }
 
       setAmount("");
@@ -68,7 +74,7 @@ export default function App() {
 
     } catch (err) {
       console.error(err);
-      setError("Failed to send payout (backend sleeping?)");
+      setError(err.message || "Failed to send payout");
     } finally {
       setLoading(false);
     }

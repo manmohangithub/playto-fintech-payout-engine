@@ -1,9 +1,7 @@
 import json
-
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.db import transaction, models
-
+from django.db import models, transaction
 from .models import Merchant, Ledger, Payout, Idempotency
 
 
@@ -20,16 +18,10 @@ def balance(request, merchant_id):
             merchant=merchant, type="debit"
         ).aggregate(total=models.Sum("amount"))["total"] or 0
 
-        return JsonResponse({
-            "balance": credits - debits
-        })
-
-    except Merchant.DoesNotExist:
-        return JsonResponse({"error": "merchant_not_found"}, status=404)
+        return JsonResponse({"balance": credits - debits})
 
     except Exception as e:
-        print("BALANCE ERROR:", str(e))
-        return JsonResponse({"error": "server_error"}, status=500)
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 # ---------------- PAYOUT LIST ----------------
@@ -45,38 +37,33 @@ def payouts(request, merchant_id):
 
         return JsonResponse({"data": data})
 
-    except Merchant.DoesNotExist:
-        return JsonResponse({"error": "merchant_not_found"}, status=404)
-
     except Exception as e:
-        print("PAYOUT LIST ERROR:", str(e))
-        return JsonResponse({"error": "server_error"}, status=500)
+        return JsonResponse({"error": str(e)}, status=500)
 
 
-# ---------------- PAYOUT CREATE ----------------
+# ---------------- PAYOUT ----------------
 @csrf_exempt
 def payout(request):
-    if request.method != "POST":
-        return JsonResponse({"error": "invalid_method"}, status=405)
-
     try:
-        # ✅ HANDLE EMPTY BODY
-        if not request.body:
-            return JsonResponse({"error": "empty_body"}, status=400)
+        if request.method != "POST":
+            return JsonResponse({"error": "invalid_method"}, status=405)
 
-        data = json.loads(request.body)
+        # ✅ Safe JSON handling (no empty_body crash)
+        try:
+            data = json.loads(request.body or "{}")
+        except:
+            return JsonResponse({"error": "invalid_json"}, status=400)
 
         merchant_id = data.get("merchant_id")
         amount = data.get("amount")
         idem_key = request.headers.get("Idempotency-Key")
 
-        # ✅ VALIDATION
-        if not merchant_id or not amount or not idem_key:
+        if not merchant_id or amount is None or not idem_key:
             return JsonResponse({"error": "missing_fields"}, status=400)
 
         amount = int(amount)
 
-        # ✅ IDEMPOTENCY
+        # ✅ Idempotency
         if Idempotency.objects.filter(key=idem_key).exists():
             return JsonResponse({"status": "duplicate"})
 
@@ -93,36 +80,27 @@ def payout(request):
 
             balance = credits - debits
 
-            # ✅ INSUFFICIENT FUNDS
             if balance < amount:
                 return JsonResponse({"error": "insufficient_funds"}, status=400)
 
-            # ✅ CREATE PAYOUT (DIRECT COMPLETE)
-            payout = Payout.objects.create(
+            # ✅ DIRECT PROCESSING (NO CELERY)
+            Payout.objects.create(
                 merchant=merchant,
                 amount=amount,
                 status="completed",
                 retries=0
             )
 
-            # ✅ UPDATE LEDGER
             Ledger.objects.create(
                 merchant=merchant,
                 amount=amount,
                 type="debit"
             )
 
-            # ✅ SAVE IDEMPOTENCY KEY
             Idempotency.objects.create(key=idem_key)
 
         return JsonResponse({"status": "completed"})
 
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "invalid_json"}, status=400)
-
-    except Merchant.DoesNotExist:
-        return JsonResponse({"error": "merchant_not_found"}, status=404)
-
     except Exception as e:
-        print("PAYOUT ERROR:", str(e))
+        print("ERROR:", e)
         return JsonResponse({"error": str(e)}, status=500)
