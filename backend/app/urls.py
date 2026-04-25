@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import balance, payout, payouts
+from .views import balance, payouts, payout
 
 urlpatterns = [
     path("balance/<int:merchant_id>/", balance),

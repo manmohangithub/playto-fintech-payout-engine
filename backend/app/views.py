@@ -5,54 +5,42 @@ from django.db import models, transaction
 from .models import Merchant, Ledger, Payout, Idempotency
 
 
-# ---------------- BALANCE ----------------
+# -------- BALANCE --------
 def balance(request, merchant_id):
-    try:
-        merchant = Merchant.objects.get(id=merchant_id)
+    merchant = Merchant.objects.get(id=merchant_id)
 
-        credits = Ledger.objects.filter(
-            merchant=merchant, type="credit"
-        ).aggregate(total=models.Sum("amount"))["total"] or 0
+    credits = Ledger.objects.filter(
+        merchant=merchant, type="credit"
+    ).aggregate(total=models.Sum("amount"))["total"] or 0
 
-        debits = Ledger.objects.filter(
-            merchant=merchant, type="debit"
-        ).aggregate(total=models.Sum("amount"))["total"] or 0
+    debits = Ledger.objects.filter(
+        merchant=merchant, type="debit"
+    ).aggregate(total=models.Sum("amount"))["total"] or 0
 
-        return JsonResponse({"balance": credits - debits})
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    return JsonResponse({"balance": credits - debits})
 
 
-# ---------------- PAYOUT LIST ----------------
+# -------- PAYOUT LIST --------
 def payouts(request, merchant_id):
-    try:
-        merchant = Merchant.objects.get(id=merchant_id)
+    merchant = Merchant.objects.get(id=merchant_id)
 
-        data = list(
-            Payout.objects.filter(merchant=merchant)
-            .order_by("-id")
-            .values("id", "amount", "status", "retries")
-        )
+    data = list(
+        Payout.objects.filter(merchant=merchant)
+        .order_by("-id")
+        .values("id", "amount", "status", "retries")
+    )
 
-        return JsonResponse({"data": data})
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    return JsonResponse({"data": data})
 
 
-# ---------------- PAYOUT ----------------
+# -------- PAYOUT --------
 @csrf_exempt
 def payout(request):
-    try:
-        if request.method != "POST":
-            return JsonResponse({"error": "invalid_method"}, status=405)
+    if request.method != "POST":
+        return JsonResponse({"error": "invalid_method"}, status=405)
 
-        # safe JSON parse
-        try:
-            data = json.loads(request.body or "{}")
-        except:
-            return JsonResponse({"error": "invalid_json"}, status=400)
+    try:
+        data = json.loads(request.body)
 
         merchant_id = data.get("merchant_id")
         amount = data.get("amount")
@@ -63,7 +51,6 @@ def payout(request):
 
         amount = int(amount)
 
-        # idempotency check
         if Idempotency.objects.filter(key=idem_key).exists():
             return JsonResponse({"status": "duplicate"})
 
@@ -83,7 +70,6 @@ def payout(request):
             if balance < amount:
                 return JsonResponse({"error": "insufficient_funds"}, status=400)
 
-            # create payout
             Payout.objects.create(
                 merchant=merchant,
                 amount=amount,
@@ -91,18 +77,15 @@ def payout(request):
                 retries=0
             )
 
-            # update ledger
             Ledger.objects.create(
                 merchant=merchant,
                 amount=amount,
                 type="debit"
             )
 
-            # save idempotency
             Idempotency.objects.create(key=idem_key)
 
         return JsonResponse({"status": "completed"})
 
     except Exception as e:
-        print("ERROR:", e)
         return JsonResponse({"error": str(e)}, status=500)
