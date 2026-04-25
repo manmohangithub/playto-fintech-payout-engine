@@ -1,8 +1,8 @@
 from django.urls import path
-from .views import balance, payout, payouts_list
+from .views import balance, payout, payouts
 
 urlpatterns = [
-    path('balance/<int:mid>/', balance),
-    path('payout/', payout),
-    path('payouts/<int:mid>/', payouts_list),
+    path("balance/<int:merchant_id>/", balance),
+    path("payouts/<int:merchant_id>/", payouts),  # ✅ FIXED
+    path("payout/", payout),
 ]
