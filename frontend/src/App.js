@@ -1,41 +1,174 @@
+import React, { useEffect, useState } from "react";
+import "./styles.css";
+
 const API = "https://playto-fintech-payout-engine.onrender.com";
+const MID = 1;
 
-const fetchData = async () => {
-  try {
-    const bRes = await fetch(`${API}/balance/1/`);
-    if (!bRes.ok) throw new Error("Backend not ready");
+export default function App() {
+  const [balance, setBalance] = useState(0);
+  const [payouts, setPayouts] = useState([]);
+  const [amount, setAmount] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("connecting");
 
-    const bData = await bRes.json();
+  // -------- FETCH DATA --------
+  const fetchData = async () => {
+    try {
+      setError("");
+      setStatus("loading");
 
-    const pRes = await fetch(`${API}/payouts/1/`);
-    const pData = await pRes.json();
+      const bRes = await fetch(`${API}/balance/${MID}/`);
+      const pRes = await fetch(`${API}/payouts/${MID}/`);
 
-    setBalance(bData.balance || 0);
-    setPayouts(pData.data || []);
+      if (!bRes.ok || !pRes.ok) {
+        throw new Error("Backend error");
+      }
 
-  } catch (err) {
-    console.log("Backend waking up...");
-  }
-};
+      const bData = await bRes.json();
+      const pData = await pRes.json();
 
-const send = async () => {
-  try {
-    await fetch(`${API}/payout/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": Date.now().toString(),
-      },
-      body: JSON.stringify({
-        merchant_id: 1,
-        amount: Number(amount),
-      }),
-    });
+      setBalance(bData.balance || 0);
+      setPayouts(pData.data || []);
+      setStatus("live");
 
+    } catch (err) {
+      console.log(err);
+      setStatus("sleeping");
+      setError("Backend waking up or unreachable...");
+    }
+  };
+
+  // -------- SEND PAYOUT --------
+  const send = async () => {
+    try {
+      if (!amount || isNaN(amount)) {
+        alert("Enter valid amount");
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+
+      const res = await fetch(`${API}/payout/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": Date.now().toString(),
+        },
+        body: JSON.stringify({
+          merchant_id: MID,
+          amount: Number(amount),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Payout failed");
+      }
+
+      setAmount("");
+      fetchData();
+
+    } catch (err) {
+      console.log(err);
+      setError(err.message || "Request failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // -------- AUTO REFRESH --------
+  useEffect(() => {
     fetchData();
-    setAmount("");
 
-  } catch {
-    alert("Backend not reachable (wait 5 sec and retry)");
-  }
-};
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // -------- UI --------
+  return (
+    <div className="app">
+
+      <div className="sidebar">
+        <h2>Playto</h2>
+        <p className="sub">Fintech Dashboard</p>
+      </div>
+
+      <div className="main">
+
+        <div className="top">
+          <h1>Dashboard</h1>
+          <span className={`status ${status}`}>
+            ● {status.toUpperCase()}
+          </span>
+        </div>
+
+        {error && <div className="error">{error}</div>}
+
+        <div className="cards">
+          <div className="card">
+            <p>Balance</p>
+            <h2>₹{(balance / 100).toFixed(2)}</h2>
+          </div>
+
+          <div className="card">
+            <p>Total Payouts</p>
+            <h2>{payouts.length}</h2>
+          </div>
+        </div>
+
+        <div className="card">
+          <h3>Request Payout</h3>
+          <div className="row">
+            <input
+              placeholder="Enter amount (paise)"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+            <button onClick={send} disabled={loading}>
+              {loading ? "Processing..." : "Send"}
+            </button>
+          </div>
+        </div>
+
+        <div className="card">
+          <h3>Payout History</h3>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Retries</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {payouts.length === 0 ? (
+                <tr>
+                  <td colSpan="3">No payouts yet</td>
+                </tr>
+              ) : (
+                payouts.map((p) => (
+                  <tr key={p.id}>
+                    <td>₹{(p.amount / 100).toFixed(2)}</td>
+                    <td>
+                      <span className={`badge ${p.status}`}>
+                        {p.status}
+                      </span>
+                    </td>
+                    <td>{p.retries}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+
+        </div>
+
+      </div>
+    </div>
+  );
+}
