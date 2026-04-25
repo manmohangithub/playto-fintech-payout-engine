@@ -5,11 +5,10 @@ class Merchant(models.Model):
 
 
 class Ledger(models.Model):
-    merchant = models.ForeignKey("Merchant", on_delete=models.CASCADE)
+    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE)
     amount = models.IntegerField()
     type = models.CharField(max_length=10)
-
-    created_at = models.DateTimeField(auto_now_add=True)  # ✅ FIX
+    created_at = models.DateTimeField(auto_now_add=True)  # IMPORTANT FIX
 
 
 class Payout(models.Model):
@@ -17,6 +16,7 @@ class Payout(models.Model):
     amount = models.IntegerField()
     status = models.CharField(max_length=20)
     retries = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 
 class Idempotency(models.Model):
