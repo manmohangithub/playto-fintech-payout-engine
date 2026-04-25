@@ -1,6 +1,5 @@
-
-Django
-mysqlclient
-celery
+gunicorn
+whitenoise
 redis
+celery
 django-cors-headers
