@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./styles.css";
 
-const API = "http://127.0.0.1:8000";
+const API = "https://playto-fintech-payout-engine.onrender.com";
 const MID = 1;
 
 export default function App() {
@@ -11,30 +11,35 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // 🔹 Fetch data
+  // ---------------- FETCH DATA ----------------
   const fetchData = async () => {
     try {
       setError("");
 
       const b = await fetch(`${API}/balance/${MID}/`);
-      const balanceData = await b.json();
-
       const p = await fetch(`${API}/payouts/${MID}/`);
-      const payoutData = await p.json();
 
-      setBalance(balanceData.balance);
-      setPayouts(payoutData.data);
+      if (!b.ok || !p.ok) throw new Error("Backend error");
+
+      const bData = await b.json();
+      const pData = await p.json();
+
+      setBalance(bData.balance || 0);
+      setPayouts(pData.data || []);
 
     } catch (err) {
-      console.error("FETCH ERROR:", err);
-      setError("Backend not reachable");
+      console.error(err);
+      setError("Backend not reachable / waking up...");
     }
   };
 
-  // 🔹 Send payout
+  // ---------------- SEND PAYOUT ----------------
   const send = async () => {
     try {
-      if (!amount) return;
+      if (!amount || isNaN(amount)) {
+        alert("Enter valid amount");
+        return;
+      }
 
       setLoading(true);
       setError("");
@@ -52,41 +57,53 @@ export default function App() {
       });
 
       const data = await res.json();
-      console.log("Response:", data);
+
+      if (!res.ok) {
+        alert(data.error || "Payout failed");
+        return;
+      }
 
       setAmount("");
       fetchData();
 
     } catch (err) {
-      console.error("SEND ERROR:", err);
-      setError("Failed to send payout");
+      console.error(err);
+      setError("Failed to send payout (backend sleeping?)");
     } finally {
       setLoading(false);
     }
   };
 
+  // ---------------- AUTO REFRESH ----------------
   useEffect(() => {
     fetchData();
-    const i = setInterval(fetchData, 3000);
-    return () => clearInterval(i);
+
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
+  // ---------------- UI ----------------
   return (
     <div className="app">
+
+      {/* SIDEBAR */}
       <div className="sidebar">
         <h2>Playto</h2>
         <p className="sub">Fintech Dashboard</p>
       </div>
 
+      {/* MAIN */}
       <div className="main">
+
         <div className="top">
           <h1>Dashboard</h1>
           <span className="live">● Live</span>
         </div>
 
-        {/* 🔥 Error Display */}
+        {/* ERROR */}
         {error && <div className="error">{error}</div>}
 
+        {/* CARDS */}
         <div className="cards">
           <div className="card">
             <p>Balance</p>
@@ -99,6 +116,7 @@ export default function App() {
           </div>
         </div>
 
+        {/* PAYOUT FORM */}
         <div className="card">
           <h3>Request Payout</h3>
           <div className="row">
@@ -107,13 +125,13 @@ export default function App() {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
-
             <button onClick={send} disabled={loading}>
               {loading ? "Processing..." : "Send"}
             </button>
           </div>
         </div>
 
+        {/* TABLE */}
         <div className="card">
           <h3>Payout History</h3>
 
@@ -127,19 +145,26 @@ export default function App() {
             </thead>
 
             <tbody>
-              {payouts.map((p) => (
-                <tr key={p.id}>
-                  <td>₹{(p.amount / 100).toFixed(2)}</td>
-                  <td>
-                    <span className={`badge ${p.status}`}>
-                      {p.status}
-                    </span>
-                  </td>
-                  <td>{p.retries}</td>
+              {payouts.length === 0 ? (
+                <tr>
+                  <td colSpan="3">No payouts yet</td>
                 </tr>
-              ))}
+              ) : (
+                payouts.map((p) => (
+                  <tr key={p.id}>
+                    <td>₹{(p.amount / 100).toFixed(2)}</td>
+                    <td>
+                      <span className={`badge ${p.status}`}>
+                        {p.status}
+                      </span>
+                    </td>
+                    <td>{p.retries}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
+
         </div>
 
       </div>
