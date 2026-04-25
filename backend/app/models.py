@@ -5,9 +5,11 @@ class Merchant(models.Model):
 
 
 class Ledger(models.Model):
-    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE)
+    merchant = models.ForeignKey("Merchant", on_delete=models.CASCADE)
     amount = models.IntegerField()
-    type = models.CharField(max_length=10)  # credit / debit
+    type = models.CharField(max_length=10)
+
+    created_at = models.DateTimeField(auto_now_add=True)  # ✅ FIX
 
 
 class Payout(models.Model):
